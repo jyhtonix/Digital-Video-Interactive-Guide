@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Digital Video Lab — p5.js (FIXED)</title>
+
+  <script src="https://unpkg.com/p5@1.9.4/lib/p5.min.js"></script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg:      #0d0d0f;
+      --panel:   #16161a;
+      --border:  #2a2a35;
+      --accent:  #a78bfa;
+      --accent2: #fb923c;
+      --green:   #34d399;
+      --text:    #e8e8f0;
+      --muted:   #6b6b80;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'Syne', sans-serif;
+      min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; padding: 2rem 1rem 4rem;
+    }
+    header { text-align: center; margin-bottom: 2.5rem; }
+    header h1 {
+      font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 800;
+      letter-spacing: -0.03em;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    header p {
+      margin-top: .4rem; color: var(--muted);
+      font-family: 'Space Mono', monospace; font-size: .75rem;
+      letter-spacing: .1em; text-transform: uppercase;
+    }
+    .wrapper {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 1.5rem; width: 100%; max-width: 1100px;
+    }
+    @media (max-width: 720px) { .wrapper { grid-template-columns: 1fr; } }
+    .canvas-card {
+      grid-column: 1 / -1; background: var(--panel);
+      border: 1px solid var(--border); border-radius: 16px;
+      overflow: hidden; display: flex; justify-content: center;
+      min-height: 360px;
+    }
+    #canvas-holder canvas { display: block; margin: 0 auto; border-radius: 12px; }
+    .card {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 16px; padding: 1.4rem;
+      display: flex; flex-direction: column; gap: .9rem;
+    }
+    .card h2 {
+      font-size: .85rem; font-weight: 700; letter-spacing: .08em;
+      text-transform: uppercase; color: var(--accent);
+    }
+    .card .desc {
+      font-family: 'Space Mono', monospace; font-size: .72rem;
+      color: var(--muted); line-height: 1.65;
+    }
+    .card .desc code {
+      color: var(--accent); background: rgba(167,139,250,.1);
+      padding: .1em .3em; border-radius: 3px;
+    }
+    .btn-row { display: flex; gap: .6rem; flex-wrap: wrap; }
+    button {
+      cursor: pointer; font-family: 'Space Mono', monospace;
+      font-size: .78rem; font-weight: 700; border: none;
+      border-radius: 8px; padding: .5rem 1.1rem; transition: transform .1s;
+    }
+    button:active { transform: scale(.95); }
+    button:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-play  { background: var(--green);   color: #000; }
+    .btn-loop  { background: var(--accent);  color: #000; }
+    .btn-pause { background: var(--accent2); color: #fff; }
+    .btn-stop  { background: #333;           color: #fff; }
+    label.slider-label {
+      font-family: 'Space Mono', monospace; font-size: .72rem;
+      color: var(--muted); display: flex; flex-direction: column; gap: .4rem;
+    }
+    label.slider-label span { color: var(--text); font-weight: 700; }
+    input[type=range] {
+      -webkit-appearance: none; width: 100%; height: 6px;
+      border-radius: 3px; background: var(--border); outline: none; cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 16px; height: 16px;
+      border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent);
+      cursor: pointer;
+    }
+    #status-badge {
+      font-family: 'Space Mono', monospace; font-size: .72rem;
+      padding: .28rem .75rem; border-radius: 99px;
+      border: 1px solid var(--border); background: var(--bg);
+      color: var(--muted); transition: all .3s; align-self: flex-start;
+    }
+    #status-badge.playing { color: var(--green);   border-color: var(--green);   background: rgba(52,211,153,.07); }
+    #status-badge.paused  { color: var(--accent2); border-color: var(--accent2); background: rgba(251,146,60,.07); }
+    .keys-row { display: flex; gap: .5rem; flex-wrap: wrap; }
+    .key-chip {
+      font-family: 'Space Mono', monospace; font-size: .75rem;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; padding: .32rem .65rem; color: var(--muted); transition: all .15s;
+    }
+    .key-chip.active { background: var(--accent); color: #000; border-color: var(--accent); }
+    .info-bar {
+      grid-column: 1 / -1; font-family: 'Space Mono', monospace;
+      font-size: .68rem; color: var(--muted); text-align: center;
+      padding: .5rem; border-top: 1px solid var(--border);
+    }
+    #unlock-overlay {
+      position: fixed; inset: 0; background: rgba(13,13,15,.97);
+      backdrop-filter: blur(10px); display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 1.6rem; z-index: 100; padding: 2rem;
+    }
+    #unlock-overlay h2 {
+      font-size: 1.8rem; font-weight: 800;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    #unlock-overlay p {
+      color: var(--muted); font-family: 'Space Mono', monospace;
+      font-size: .78rem; text-align: center; max-width: 380px; line-height: 1.7;
+    }
+    .file-drop {
+      display: flex; flex-direction: column; align-items: center; gap: 1rem;
+      border: 1px dashed var(--border); border-radius: 14px;
+      padding: 2rem 2.5rem; width: 100%; max-width: 420px; transition: border-color .2s;
+    }
+    .file-drop:hover { border-color: var(--accent); }
+    .file-drop svg { opacity: .5; }
+    .file-drop p { font-family: 'Space Mono', monospace; font-size: .75rem; color: var(--muted); text-align: center; }
+    #file-input { display: none; }
+    #pick-btn {
+      font-size: .85rem; padding: .7rem 1.8rem; border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #000; font-weight: 800; font-family: 'Syne', sans-serif;
+      cursor: pointer; border: none; transition: transform .15s;
+    }
+    #pick-btn:hover { transform: scale(1.04); }
+    #file-name {
+      font-family: 'Space Mono', monospace; font-size: .75rem; color: var(--accent);
+      display: none; text-align: center; word-break: break-all; max-width: 360px;
+    }
+    #load-msg { font-family: 'Space Mono', monospace; font-size: .78rem; color: var(--accent); display: none; }
+    #error-msg { font-family: 'Space Mono', monospace; font-size: .78rem; color: var(--accent2); display: none; }
+    #progress-wrap {
+      grid-column: 1 / -1; display: none; flex-direction: column;
+      gap: .5rem; padding: .2rem .5rem .8rem;
+    }
+    #progress-wrap.visible { display: flex; }
+    #progress-bar-bg {
+      width: 100%; height: 5px; background: var(--border);
+      border-radius: 3px; cursor: pointer; position: relative;
+    }
+    #progress-bar-fill {
+      height: 100%; background: var(--accent); border-radius: 3px;
+      width: 0%; transition: width .15s linear; pointer-events: none;
+    }
+    #time-label {
+      font-family: 'Space Mono', monospace; font-size: .68rem;
+      color: var(--muted); text-align: right;
+    }
+    .volume-rate-row {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .volume-rate-row label.slider-label {
+      flex: 1;
+      min-width: 140px;
+    }
+
+    /*
+     * FIX #1: Instead of vid.hide() which sets display:none and stops
+     * the browser from decoding frames, we position the raw <video>
+     * element off-screen. The browser keeps decoding; p5 can draw it.
+     */
+    #p5-video-offscreen {
+      position: fixed;
+      left: -9999px;
+      top: -9999px;
+      width: 1px;
+      height: 1px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+<div id="unlock-overlay">
+  <h2>📹 Digital Video Lab</h2>
+  <p>
+    Select any <strong>MP4 / WebM / OGV</strong> video file
+    using the button below to begin.
+  </p>
+  <div class="file-drop">
+    <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.4">
+      <rect x="2" y="2" width="20" height="20" rx="2.5"/>
+      <path d="M7 2v20M17 2v20M2 12h20M2 7h5M17 7h5M2 17h5M17 17h5"/>
+    </svg>
+    <p>Supports MP4, WebM, OGV — any HTML5-compatible video</p>
+    <input type="file" id="file-input" accept="video/*" />
+    <button id="pick-btn" onclick="document.getElementById('file-input').click()">
+      Browse Video Files
+    </button>
+    <span id="file-name"></span>
+  </div>
+  <span id="load-msg">Loading video...</span>
+  <span id="error-msg"></span>
+</div>
+
+<!--
+  FIX #1 (cont.): A dedicated container for the raw <video> element,
+  kept off-screen via CSS above. p5 will move the video element here
+  instead of hiding it with display:none.
+-->
+<div id="p5-video-offscreen"></div>
+
+<header>
+  <h1>Digital Video Lab</h1>
+  <p>p5.js interactive guide &nbsp;·&nbsp; Topic 13 — Video Edition</p>
+</header>
+
+<div class="wrapper">
+
+  <div class="canvas-card" id="canvas-holder"></div>
+
+  <div id="progress-wrap">
+    <div id="progress-bar-bg"><div id="progress-bar-fill"></div></div>
+    <div id="time-label">0:00 / 0:00</div>
+  </div>
+
+  <div class="card">
+    <h2>Playback Control</h2>
+    <p class="desc">
+      <code>vid.play()</code> plays once · 
+      <code>vid.loop()</code> loops continuously · 
+      <code>vid.pause()</code> freezes frame · 
+      <code>vid.stop()</code> rewinds to start
+    </p>
+    <div id="status-badge">Stopped</div>
+    <div class="btn-row">
+      <button class="btn-play"  id="btn-play" >▶ Play</button>
+      <button class="btn-loop"  id="btn-loop" >🔁 Loop</button>
+      <button class="btn-pause" id="btn-pause">⏸ Pause</button>
+      <button class="btn-stop"  id="btn-stop" >⏹ Stop</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Volume &amp; Playback Speed</h2>
+    <p class="desc">
+      <code>vid.volume(0-1)</code> controls audio · 
+      <code>vid.speed()</code> changes playback speed
+    </p>
+    <div class="volume-rate-row">
+      <label class="slider-label">🔊 Volume — <span id="vol-val">0.80</span>
+        <input type="range" id="vol-slider" min="0" max="1" step="0.01" value="0.8" />
+      </label>
+      <label class="slider-label">⚡ Speed — <span id="rate-val">1.00</span>x
+        <input type="range" id="rate-slider" min="0.25" max="3.0" step="0.05" value="1.0" />
+      </label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>⌨️ Keyboard Shortcuts</h2>
+    <p class="desc">
+      <kbd>P</kbd> — Play/Pause · <kbd>S</kbd> — Stop · <kbd>F</kbd> — Mute toggle · Click canvas — Play/Pause
+    </p>
+    <div class="keys-row">
+      <div class="key-chip" id="key-p">P — Play / Pause</div>
+      <div class="key-chip" id="key-s">S — Stop</div>
+      <div class="key-chip" id="key-f">F — Mute toggle</div>
+      <div class="key-chip" id="key-click">🖱️ Canvas click — Play/Pause</div>
+    </div>
+  </div>
+
+  <div class="info-bar" id="info-bar">
+    No file loaded &nbsp;·&nbsp; Topic 13 — Digital Video Lab
+  </div>
+</div>
+
+<script>
+// ================================================================
+//  FIXED VIDEO PLAYBACK
+//
+//  KEY FIXES:
+//  1. vid.hide() → move element off-screen instead (display:none
+//     stops the browser GPU decoder — audio plays, frames don't)
+//  2. Single load path — removed duplicate canplay listener that
+//     fought the p5 callback and double-called wireUI()
+//  3. isPlaying() guard — wrapped in try/catch; some p5 builds
+//     throw when called before the video element is fully ready
+//  4. Pause icon — uses vid.elt.paused (native DOM) instead of
+//     !vid.isPlaying() which is unreliable mid-seek
+// ================================================================
+
+let p5Instance;
+let vid;
+let vidLoaded = false;
+let vidWidth  = 640;
+let vidHeight = 360;
+let currentVolume = 0.8;
+let currentRate   = 1.0;
+let blobURL = null;
+let uiWired = false;   // FIX #2: guard against wireUI() running twice
+
+// ================================================================
+//  p5 SKETCH
+// ================================================================
+const sketch = (s) => {
+
+  s.setup = function() {
+    let cnv = s.createCanvas(800, 480);
+    cnv.parent('canvas-holder');
+    s.background(22, 22, 26);
+    s.pixelDensity(1);
+  };
+
+  s.draw = function() {
+    s.background(22, 22, 26);
+
+    if (!vidLoaded || !vid) {
+      drawIdleMessage(s);
+      return;
+    }
+
+    // FIX #3: use native readyState; readyState >= 2 = HAVE_CURRENT_DATA
+    // readyState 0 = no data, 1 = metadata only, 2+ = frame available
+    let elt = vid.elt;
+    if (elt && elt.readyState >= 2 && vidWidth > 0 && vidHeight > 0) {
+      let [x, y, w, h] = letterbox(vidWidth, vidHeight, s.width, s.height);
+      s.image(vid, x, y, w, h);
+
+      // FIX #4: use native DOM .paused instead of !vid.isPlaying()
+      // vid.isPlaying() can be wrong during the first few frames
+      if (elt.paused && elt.currentTime > 0) {
+        drawPauseIcon(s);
+      }
+    } else if (elt && elt.readyState < 2) {
+      s.fill(150, 150, 170);
+      s.noStroke();
+      s.textAlign(s.CENTER, s.CENTER);
+      s.textFont('monospace');
+      s.textSize(14);
+      s.text('Loading video frames…', s.width / 2, s.height / 2);
+    }
+
+    updateProgressBar();
+    updateBadge();
+  };
+
+  s.mousePressed = function() {
+    if (!vidLoaded || !vid) return;
+    if (s.mouseX >= 0 && s.mouseX <= s.width &&
+        s.mouseY >= 0 && s.mouseY <= s.height) {
+      togglePlayPause();
+      flashKey('key-click');
+    }
+  };
+
+  s.keyPressed = function() {
+    if (!vidLoaded || !vid) return;
+    if (s.key === 'p' || s.key === 'P') { togglePlayPause(); flashKey('key-p'); }
+    if (s.key === 's' || s.key === 'S') { vid.stop(); flashKey('key-s'); }
+    if (s.key === 'f' || s.key === 'F') {
+      currentVolume = (currentVolume > 0) ? 0 : 0.8;
+      vid.volume(currentVolume);
+      let vs = document.getElementById('vol-slider');
+      let vv = document.getElementById('vol-val');
+      if (vs) vs.value = String(currentVolume);
+      if (vv) vv.textContent = currentVolume.toFixed(2);
+      flashKey('key-f');
+    }
+    return false;
+  };
+};
+
+// FIX #4 helper — use native DOM .paused for reliable state
+function togglePlayPause() {
+  if (!vid) return;
+  if (vid.elt.paused) {
+    vid.play();
+  } else {
+    vid.pause();
+  }
+}
+
+function drawPauseIcon(s) {
+  let cx = s.width / 2, cy = s.height / 2;
+  s.push();
+  s.noFill();
+  s.stroke(255, 255, 255, 200);
+  s.strokeWeight(2.5);
+  s.rect(cx - 16, cy - 22, 9, 44, 3);
+  s.rect(cx + 7,  cy - 22, 9, 44, 3);
+  s.pop();
+}
+
+function letterbox(srcW, srcH, dstW, dstH) {
+  let scale = Math.min(dstW / srcW, dstH / srcH);
+  let w = srcW * scale, h = srcH * scale;
+  return [(dstW - w) / 2, (dstH - h) / 2, w, h];
+}
+
+function drawIdleMessage(s) {
+  let cx = s.width / 2, cy = s.height / 2;
+  let pulse = s.sin(s.frameCount * 0.05) * 0.5 + 0.5;
+  s.noFill();
+  s.stroke(167, 139, 250, s.map(pulse, 0, 1, 40, 100));
+  s.strokeWeight(1.5);
+  for (let r = 1; r <= 3; r++) s.ellipse(cx, cy, 70 + r * 35 * pulse);
+  s.noStroke();
+  s.fill(167, 139, 250, s.map(pulse, 0, 1, 100, 200));
+  s.triangle(cx - 18, cy - 20, cx - 18, cy + 20, cx + 24, cy);
+  s.fill(107, 107, 128);
+  s.textAlign(s.CENTER, s.CENTER);
+  s.textFont('monospace');
+  s.textSize(13);
+  s.text('Select a video file to begin', cx, cy + 55);
+  s.textSize(10);
+  s.text('Supports MP4, WebM, OGV', cx, cy + 80);
+}
+
+function flashKey(id) {
+  let el = document.getElementById(id);
+  if (!el) return;
+  el.classList.add('active');
+  setTimeout(() => el.classList.remove('active'), 200);
+}
+
+function updateBadge() {
+  let badge = document.getElementById('status-badge');
+  if (!badge || !vidLoaded || !vid) return;
+  // FIX #4: use native DOM for state
+  let elt = vid.elt;
+  if (!elt.paused) {
+    badge.className = 'playing';
+    badge.textContent = '▶ Playing';
+  } else if (elt.currentTime > 0 && !elt.ended) {
+    badge.className = 'paused';
+    badge.textContent = '⏸ Paused';
+  } else {
+    badge.className = '';
+    badge.textContent = '⏹ Stopped';
+  }
+}
+
+function updateProgressBar() {
+  if (!vidLoaded || !vid) return;
+  let elt = vid.elt;
+  let dur = elt.duration;
+  if (!dur || isNaN(dur) || dur === 0) return;
+  let cur = elt.currentTime;
+  let fillEl = document.getElementById('progress-bar-fill');
+  let label  = document.getElementById('time-label');
+  if (fillEl) fillEl.style.width = ((cur / dur) * 100) + '%';
+  if (label)  label.textContent = formatTime(cur) + ' / ' + formatTime(dur);
+}
+
+function formatTime(s) {
+  if (isNaN(s)) return '0:00';
+  return Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+}
+
+// ================================================================
+//  FILE LOADING — single clean path, no duplicate handlers
+// ================================================================
+document.getElementById('file-input').addEventListener('change', function(e) {
+  let file = e.target.files[0];
+  if (!file) return;
+
+  let nameEl  = document.getElementById('file-name');
+  let loadMsg = document.getElementById('load-msg');
+  let errMsg  = document.getElementById('error-msg');
+  let pickBtn = document.getElementById('pick-btn');
+
+  nameEl.textContent = file.name;
+  nameEl.style.display = 'block';
+  loadMsg.style.display = 'block';
+  errMsg.style.display  = 'none';
+  if (pickBtn) pickBtn.disabled = true;
+
+  // Clean up previous video
+  if (blobURL) URL.revokeObjectURL(blobURL);
+  if (vid) { vid.stop(); vid.remove(); vid = null; }
+  vidLoaded = false;
+  uiWired   = false;
+  blobURL   = URL.createObjectURL(file);
+
+  // FIX #2: single callback, no canplay race condition
+  vid = p5Instance.createVideo(blobURL, onVideoReady);
+
+  // FIX #1 (THE MAIN FIX):
+  // p5's createVideo() appends the <video> element to the document and
+  // then vid.hide() sets display:none on it.
+  // display:none causes browsers to stop decoding video frames —
+  // the audio decoder keeps running (hence you hear sound) but the
+  // video decoder pauses, so p5's image() draws nothing.
+  //
+  // Solution: move the element off-screen with CSS instead.
+  // We wait one tick for p5 to finish creating the element.
+  setTimeout(() => {
+    if (vid && vid.elt) {
+      let offscreen = document.getElementById('p5-video-offscreen');
+      // Remove p5's default styling that hides it
+      vid.elt.removeAttribute('style');
+      // Move to our off-screen container (visible to GPU, invisible to user)
+      offscreen.appendChild(vid.elt);
+    }
+  }, 0);
+
+  vid.volume(currentVolume);
+
+  vid.elt.addEventListener('error', function() {
+    errMsg.textContent = 'Error loading video. Please try another file.';
+    errMsg.style.display = 'block';
+    loadMsg.style.display = 'none';
+    if (pickBtn) pickBtn.disabled = false;
+  });
+
+  function onVideoReady() {
+    if (vidLoaded) return;  // safety guard
+
+    vidWidth  = vid.elt.videoWidth  || 640;
+    vidHeight = vid.elt.videoHeight || 360;
+    if (vidWidth  <= 0) vidWidth  = 640;
+    if (vidHeight <= 0) vidHeight = 360;
+
+    vidLoaded = true;
+    vid.play();
+    vid.volume(currentVolume);
+    if (currentRate !== 1.0) vid.speed(currentRate);
+
+    // Show UI
+    let overlay = document.getElementById('unlock-overlay');
+    if (overlay) overlay.style.display = 'none';
+    let progressWrap = document.getElementById('progress-wrap');
+    if (progressWrap) progressWrap.classList.add('visible');
+    let msg = document.getElementById('load-msg');
+    if (msg) msg.style.display = 'none';
+    let infoBar = document.getElementById('info-bar');
+    if (infoBar) infoBar.textContent =
+      file.name + '  |  ' + vidWidth + '×' + vidHeight +
+      '  |  Topic 13 — Digital Video Lab';
+
+    wireUI();
+  }
+});
+
+// ================================================================
+//  UI WIRING — FIX #2: guarded so it only runs once per video
+// ================================================================
+function wireUI() {
+  if (uiWired || !vid) return;
+  uiWired = true;
+
+  document.getElementById('btn-play').onclick  = () => vid && vid.play();
+  document.getElementById('btn-loop').onclick  = () => vid && vid.loop();
+  document.getElementById('btn-pause').onclick = () => vid && vid.pause();
+  document.getElementById('btn-stop').onclick  = () => vid && vid.stop();
+
+  let volSlider  = document.getElementById('vol-slider');
+  let volVal     = document.getElementById('vol-val');
+  let rateSlider = document.getElementById('rate-slider');
+  let rateVal    = document.getElementById('rate-val');
+  let seekBg     = document.getElementById('progress-bar-bg');
+
+  volSlider.oninput = () => {
+    currentVolume = parseFloat(volSlider.value);
+    volVal.textContent = currentVolume.toFixed(2);
+    if (vid) vid.volume(currentVolume);
+  };
+
+  rateSlider.oninput = () => {
+    currentRate = parseFloat(rateSlider.value);
+    rateVal.textContent = currentRate.toFixed(2);
+    if (vid) vid.speed(currentRate);
+  };
+
+  seekBg.onclick = (e) => {
+    if (!vid) return;
+    let dur = vid.elt.duration;
+    if (!dur || isNaN(dur)) return;
+    let rect = e.currentTarget.getBoundingClientRect();
+    let pct  = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    vid.elt.currentTime = pct * dur;   // set via native DOM — more reliable
+  };
+}
+
+// Start p5
+p5Instance = new p5(sketch);
+</script>
+</body>
+</html>
